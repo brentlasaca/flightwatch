@@ -1,0 +1,97 @@
+export type TripType = 1 | 2;
+export type TravelClass = 1 | 2 | 3 | 4;
+export type StopsFilter = 0 | 1 | 2;
+export type AlertDirection = 'below' | 'above';
+export type TrackerStatus = 'active' | 'paused';
+export type FetchStatus = 'success' | 'error' | 'offline' | 'no_results';
+export type FetchFrequency = 'hourly' | '3h' | '6h' | '12h' | 'daily';
+export type Theme = 'light' | 'dark' | 'system';
+export type Screen = 'onboarding' | 'home' | 'detail' | 'settings';
+
+export interface FlightParams {
+  departure_id: string;
+  departure_name?: string;
+  arrival_id: string;
+  arrival_name?: string;
+  outbound_date: string;
+  return_date?: string;
+  type: TripType;
+  adults: number;
+  children: number;
+  infants_in_seat: number;
+  infants_on_lap: number;
+  travel_class: TravelClass;
+  stops: StopsFilter;
+  hl: string;
+}
+
+export interface Schedule {
+  frequency: FetchFrequency;
+  timeWindow: 'any';
+  activeDays: 'all';
+}
+
+export interface Tracker {
+  id: string;
+  name: string;
+  params: FlightParams;
+  targetPrice: number;
+  alertDirection: AlertDirection;
+  currency: string;
+  schedule: Schedule;
+  notificationsEnabled: boolean;
+  cooldownHours: number;
+  status: TrackerStatus;
+  createdAt: string;
+  updatedAt: string;
+  lastFetchedAt?: string;
+  lastNotifiedAt?: string;
+  lastKnownPrice?: number;
+}
+
+/** Price insights returned by Google Flights API */
+export interface PriceInsights {
+  lowest_price: number;
+  price_level: string; // 'low' | 'typical' | 'high'
+  typical_price_range: [number, number];
+  price_history: [number, number][]; // [unix_timestamp_seconds, price]
+}
+
+export interface PriceRecord {
+  id: string;
+  trackerId: string;
+  fetchedAt: string;
+  lowestPrice: number;
+  currency: string;
+  flights: SerpFlight[];
+  status: FetchStatus;
+  errorMessage?: string;
+  priceInsights?: PriceInsights;
+}
+
+export interface SerpFlight {
+  price: number;
+  airline?: string;
+  duration?: number;
+  stops?: number;
+}
+
+export interface Airport {
+  iata: string;
+  name: string;
+  city: string;
+  country: string;
+}
+
+export interface AirportSuggestion {
+  id: string;
+  name: string;
+  city: string;
+  country: string;
+}
+
+export interface ToastMessage {
+  id: string;
+  message: string;
+  type?: 'success' | 'error' | 'info';
+}

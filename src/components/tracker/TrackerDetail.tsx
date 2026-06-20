@@ -129,11 +129,13 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
   );
 
   return (
-    <div className="flex flex-col min-h-dvh bg-slate-50 dark:bg-slate-900">
-      {/* App header — logo + wordmark + ⋯ overflow in right slot */}
+    <div className="flex flex-col bg-slate-50 dark:bg-slate-900">
+      {/* App header — logo + wordmark + ⋯ overflow in right slot.
+          Sticky now works correctly because <main> in page.tsx is the
+          single bounded overflow-y-auto ancestor. */}
       <AppHeader right={overflowAction} />
 
-      <div className="overflow-y-auto pb-24 flex-1">
+      <div className="pb-24">
         {/* Back nav + route heading */}
         <div className="px-4 pt-4 pb-2">
           <button

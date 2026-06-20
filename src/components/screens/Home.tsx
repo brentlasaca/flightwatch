@@ -114,8 +114,9 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   );
 
   return (
-    <div className="flex flex-col min-h-dvh bg-slate-50 dark:bg-slate-900 pb-20">
-      {/* Persistent header with logo + Bell */}
+    <div className="flex flex-col bg-slate-50 dark:bg-slate-900 pb-20">
+      {/* Persistent header with logo + Bell — sticky relative to <main>'s
+          scrollport in page.tsx, which is now the single true scroll region. */}
       <AppHeader right={bellAction} />
 
       {/* Search */}

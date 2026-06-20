@@ -149,7 +149,7 @@ export function Settings() {
   };
 
   return (
-    <div className="flex flex-col min-h-dvh bg-slate-50 dark:bg-slate-900 pb-24">
+    <div className="flex flex-col bg-slate-50 dark:bg-slate-900 pb-24">
       {/* Persistent app header — no right-slot element on Settings */}
       <AppHeader />
 

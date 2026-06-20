@@ -66,14 +66,23 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50 dark:bg-slate-900 flex flex-col max-w-lg mx-auto relative">
+    <div className="h-dvh bg-slate-50 dark:bg-slate-900 flex flex-col max-w-lg mx-auto relative overflow-hidden">
       {/* Desktop centering shadow */}
       <div className="hidden md:block fixed inset-y-0 left-1/2 -translate-x-1/2 w-[480px] shadow-2xl pointer-events-none z-0 border-x border-slate-200 dark:border-slate-700" />
 
-      <div className="relative z-10 flex flex-col flex-1">
+      <div className="relative z-10 flex flex-col flex-1 min-h-0">
         <SystemBanners />
 
-        <main className="flex-1 overflow-hidden">
+        {/*
+          `<main>` is the single true scrolling region for all screens.
+          `min-h-0` lets it actually shrink to the available flex space
+          (flex items default to min-height: auto, which would otherwise
+          let content push this taller than the viewport). Because this
+          is the only overflow-y-auto ancestor, each screen's sticky
+          AppHeader now correctly pins to the top of *this* scrollport
+          instead of scrolling away with the rest of the page.
+        */}
+        <main className="flex-1 min-h-0 overflow-y-auto">
           {screen === 'home' && (
             <Home onAddTracker={handleAddTracker} onEditTracker={handleEditTracker} />
           )}

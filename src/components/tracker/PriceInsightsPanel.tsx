@@ -96,7 +96,7 @@ export function PriceInsightsPanel({ history, currency, targetPrice }: PriceInsi
 
             {/* Summary stats row */}
             {insights && (
-              <div className="border-t border-slate-100 dark:border-slate-700 p-3 flex gap-2">
+              <div className="border-t border-slate-100 dark:border-slate-700 p-3 flex gap-2 min-w-0">
                 {/* Current price */}
                 <StatChip
                   value={fmt(insights.lowest_price, currency)}
@@ -105,9 +105,9 @@ export function PriceInsightsPanel({ history, currency, targetPrice }: PriceInsi
                 />
                 {/* Price level */}
                 {insights.price_level && (
-                  <div className="flex-1 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-2.5 text-center flex flex-col items-center gap-1">
+                  <div className="min-w-0 flex-1 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-2.5 text-center flex flex-col items-center gap-1">
                     <PriceLevelBadge level={insights.price_level} />
-                    <p className="text-[10px] text-slate-400 dark:text-slate-500">Price Level</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate w-full">Price Level</p>
                   </div>
                 )}
                 {/* Typical range */}
@@ -169,11 +169,11 @@ function StatChip({
 }) {
   return (
     <div
-      className={`rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-2.5 text-center flex flex-col items-center gap-1 ${className}`}
+      className={`min-w-0 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-700 p-2.5 text-center flex flex-col items-center gap-1 ${className}`}
       aria-label={ariaLabel}
     >
-      <p className={`font-semibold leading-tight ${valueSize} ${valueColor}`}>{value}</p>
-      <p className="text-[10px] text-slate-400 dark:text-slate-500">{label}</p>
+      <p className={`font-semibold leading-tight break-words ${valueSize} ${valueColor}`}>{value}</p>
+      <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate w-full">{label}</p>
     </div>
   );
 }

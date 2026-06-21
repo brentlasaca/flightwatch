@@ -127,7 +127,7 @@ export function Settings() {
       if ('serviceWorker' in navigator) {
         const reg = await navigator.serviceWorker.ready;
         await reg.showNotification('✈ Flightwatch — Test notification', {
-          body: 'Push notifications are working! You will be alerted when a fare hits your target.',
+          body: "Notifications are working! You'll be alerted when a fare hits your target during a check.",
           icon: '/icons/icon-192.png',
           badge: '/icons/icon-192.png',
           tag: 'fw-test',
@@ -136,7 +136,7 @@ export function Settings() {
       } else {
         // Fallback for browsers without service worker (non-PWA desktop)
         new Notification('✈ Flightwatch — Test notification', {
-          body: 'Push notifications are working!',
+          body: 'Notifications are working!',
           icon: '/icons/icon-192.png',
         });
         toast('Test notification sent');
@@ -191,7 +191,7 @@ export function Settings() {
                   {testingNotif ? 'Sending…' : 'Send test notification'}
                 </p>
                 <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Verify push notifications are working on this device
+                  Verify notifications are working on this device
                 </p>
               </div>
             </button>

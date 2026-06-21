@@ -1,7 +1,7 @@
 
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, Info } from 'lucide-react';
 import { getDB } from '@/lib/db';
 import { estimateDailyApiCalls } from '@/lib/serpapi';
 import { CURRENCY_OPTIONS, DEFAULT_CURRENCY, getCurrencySymbol } from '@/data/currencies';
@@ -171,7 +171,7 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
           targetPrice: parseFloat(form.targetPrice),
           alertDirection: form.alertDirection,
           currency: form.currency,
-          schedule: { frequency: form.frequency, timeWindow: 'any', activeDays: 'all' },
+          schedule: { frequency: form.frequency },
           notificationsEnabled: form.notificationsEnabled,
           cooldownHours: form.cooldownHours,
           updatedAt: now,
@@ -182,7 +182,7 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
           targetPrice: parseFloat(form.targetPrice),
           alertDirection: form.alertDirection,
           currency: form.currency,
-          schedule: { frequency: form.frequency, timeWindow: 'any', activeDays: 'all' },
+          schedule: { frequency: form.frequency },
           notificationsEnabled: form.notificationsEnabled,
           cooldownHours: form.cooldownHours,
           status: 'active', createdAt: now, updatedAt: now,
@@ -353,16 +353,20 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
           </div>
         </div>
 
-        {/* ── Schedule ── */}
+        {/* ── Recheck Interval ── */}
         <div className="px-4 pt-5">
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Schedule</p>
+          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Recheck Interval</p>
           <label className="text-sm font-medium text-slate-700 dark:text-slate-200 block mb-1">Check every</label>
           <select value={form.frequency} onChange={e => set('frequency', e.target.value as FetchFrequency)}
             className="w-full px-3 py-3 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500 mb-2">
             {FREQUENCIES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
+          <div className="flex items-start gap-1.5 text-[11px] text-slate-400 dark:text-slate-500 leading-relaxed mb-2">
+            <Info size={12} className="flex-shrink-0 mt-0.5" />
+            Checked when you open this tracker, open Home, or tap Check now — not on a timer in the background.
+          </div>
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            ~{dailyCalls} API call{dailyCalls !== 1 ? 's' : ''}/day for this tracker
+            Up to ~{dailyCalls} API call{dailyCalls !== 1 ? 's' : ''}/day
           </p>
         </div>
 

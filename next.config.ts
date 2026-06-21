@@ -5,6 +5,10 @@ const withPWA = withPWAInit({
   dest: 'public',
   // Keep SW disabled in dev — avoids stale-cache surprises during development
   disable: process.env.NODE_ENV === 'development',
+  // Merges worker/index.js (message + notificationclick handlers) into the
+  // generated sw.js. There is no push handler here — Flightwatch has no
+  // backend server and never receives server-initiated Web Push.
+  customWorkerSrc: 'worker',
   workboxOptions: {
     skipWaiting: true,
     clientsClaim: true,

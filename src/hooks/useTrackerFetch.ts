@@ -4,12 +4,27 @@ import { useCallback, useRef } from 'react';
 import { getDB } from '@/lib/db';
 import { fetchFlightPrice } from '@/lib/serpapi';
 import { showPriceAlert, showQuotaExhaustedNotification } from '@/lib/notifications';
+import { isTrackerStale } from '@/lib/recheck';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tracker } from '@/types';
 
+interface FetchAllOptions {
+  /** Called right before a given tracker's recheck fetch begins. */
+  onTrackerStart?: (trackerId: string) => void;
+  /** Called once that tracker's fetch settles (success or failure). */
+  onTrackerEnd?: (trackerId: string) => void;
+  /** Skip the staleness check and recheck every active tracker. Default false. */
+  force?: boolean;
+}
+
 interface UseFetchResult {
   fetchTracker: (tracker: Tracker) => Promise<{ quotaExhausted?: boolean }>;
-  fetchAllActive: (trackers: Tracker[]) => Promise<void>;
+  /**
+   * Opportunistically rechecks active trackers whose recheck interval has
+   * elapsed (PRD §4.2.3). This is the Home-screen-load batch trigger
+   * (PRD §4.2.1, trigger 1) — it must never run on a timer.
+   */
+  fetchAllActive: (trackers: Tracker[], opts?: FetchAllOptions) => Promise<void>;
 }
 
 export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
@@ -73,10 +88,12 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
     }
   }, [onQuotaExhausted]);
 
-  const fetchAllActive = useCallback(async (trackers: Tracker[]) => {
-    const active = trackers.filter(t => t.status === 'active');
-    for (const t of active) {
+  const fetchAllActive = useCallback(async (trackers: Tracker[], opts?: FetchAllOptions) => {
+    const due = trackers.filter(t => t.status === 'active' && (opts?.force || isTrackerStale(t)));
+    for (const t of due) {
+      opts?.onTrackerStart?.(t.id);
       const result = await fetchTracker(t);
+      opts?.onTrackerEnd?.(t.id);
       if (result.quotaExhausted) break;
     }
   }, [fetchTracker]);

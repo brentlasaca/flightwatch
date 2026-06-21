@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { KeyRound, Eye, EyeOff, ExternalLink } from 'lucide-react';
+import { KeyRound, Eye, EyeOff, ExternalLink, Info } from 'lucide-react';
 import { validateApiKey } from '@/lib/serpapi';
 import { saveApiKey } from '@/lib/crypto';
 import { Button } from '@/components/ui/Button';
@@ -91,6 +91,11 @@ export function Onboarding() {
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <KeyRound size={12} className="flex-shrink-0" />
             Stored securely on your device only
+          </div>
+
+          <div className="flex items-start gap-1.5 text-xs text-slate-500 leading-relaxed">
+            <Info size={12} className="flex-shrink-0 mt-0.5" />
+            Flightwatch checks prices when you open the app or tap Check now — it doesn&rsquo;t run in the background.
           </div>
 
           <Button

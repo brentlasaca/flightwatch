@@ -25,10 +25,19 @@ export interface FlightParams {
   hl: string;
 }
 
+/**
+ * A tracker's recheck interval configuration.
+ *
+ * PRD v1.5 / Design Specs v1.3: Flightwatch has no backend server, so it
+ * cannot guarantee fetches on a fixed background schedule. `frequency` is a
+ * staleness threshold evaluated only when the user opens Home, opens this
+ * tracker's Detail screen, or taps "Check now" — never on a timer while the
+ * app is closed. The "Fetch time window" and "Active days" controls that
+ * existed in earlier versions implied a level of background scheduling
+ * precision Flightwatch cannot deliver and have been removed entirely.
+ */
 export interface Schedule {
   frequency: FetchFrequency;
-  timeWindow: 'any';
-  activeDays: 'all';
 }
 
 export interface Tracker {

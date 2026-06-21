@@ -145,7 +145,10 @@ export function TrackerCard({ tracker, onClick, onTogglePause, onDelete, onFetch
                 {isPaused ? 'Tracking paused' : 'Checking prices…'}
               </div>
             )}
-            <p className="text-[10px] text-slate-300 dark:text-slate-600 mt-1.5">{lastChecked}</p>
+            <p className="text-[10px] text-slate-300 dark:text-slate-600 mt-1.5 flex items-center gap-1">
+              {isFetching && <RefreshCw size={9} className="animate-spin" />}
+              {isFetching ? 'Updating…' : lastChecked}
+            </p>
           </div>
 
           {/* Sparkline: blended local + API history */}

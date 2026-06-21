@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { AppProvider, useApp } from '@/context/AppContext';
 import { ToastProvider } from '@/context/ToastContext';
@@ -15,6 +15,7 @@ import { SystemBanners } from '@/components/system/SystemBanners';
 import { OfflineIndicator } from '@/components/system/OfflineIndicator';
 import { InstallPrompt } from '@/components/system/InstallPrompt';
 import { useTrackerFetch } from '@/hooks/useTrackerFetch';
+import { isTrackerStale } from '@/lib/recheck';
 import { getDB } from '@/lib/db';
 import type { Tracker } from '@/types';
 
@@ -46,6 +47,19 @@ function AppContent() {
     await fetchTracker(tracker);
     setFetchingIds(prev => { const n = new Set(prev); n.delete(tracker.id); return n; });
   }, [fetchTracker]);
+
+  // Tracker Detail open is the second of Flightwatch's three actual fetch
+  // triggers (PRD §4.2.1): opportunistically recheck this tracker if its
+  // recheck interval has elapsed, once per visit to this screen.
+  const detailFetchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (screen !== 'detail') { detailFetchedRef.current = null; return; }
+    if (!activeTracker || detailFetchedRef.current === activeTracker.id) return;
+    detailFetchedRef.current = activeTracker.id;
+    if (activeTracker.status === 'active' && isTrackerStale(activeTracker)) {
+      handleFetch(activeTracker);
+    }
+  }, [screen, activeTracker, handleFetch]);
 
   const handleAddTracker = () => {
     setEditTracker(undefined);

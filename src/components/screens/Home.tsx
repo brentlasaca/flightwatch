@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Bell, BellOff } from 'lucide-react';
+import { Search, Bell, BellOff, Info } from 'lucide-react';
 import { getDB, pruneOldHistory } from '@/lib/db';
 import { estimateDailyApiCalls } from '@/lib/serpapi';
 import { useApp } from '@/context/AppContext';
@@ -28,6 +28,7 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   const [deleteTarget, setDeleteTarget] = useState<Tracker | null>(null);
   const [deleting, setDeleting]         = useState(false);
   const [fetchingIds, setFetchingIds]   = useState<Set<string>>(new Set());
+  const [showCallsInfo, setShowCallsInfo] = useState(false);
   const didInitFetch = useRef(false);
 
   const handleQuota = useCallback(() => {
@@ -42,7 +43,10 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
     if (didInitFetch.current || !allTrackers) return;
     didInitFetch.current = true;
     pruneOldHistory().catch(console.warn);
-    fetchAllActive(allTrackers);
+    fetchAllActive(allTrackers, {
+      onTrackerStart: id => setFetchingIds(prev => new Set([...prev, id])),
+      onTrackerEnd:   id => setFetchingIds(prev => { const n = new Set(prev); n.delete(id); return n; }),
+    });
   }, [allTrackers, fetchAllActive]);
 
   const handleFetch = useCallback(async (tracker: Tracker) => {
@@ -184,11 +188,23 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
         )}
 
         {totalCalls > 0 && (
-          <p className="text-xs text-slate-300 dark:text-slate-600 text-center py-2">
-            ~{totalCalls} API call{totalCalls !== 1 ? 's' : ''}/day across{' '}
-            {(allTrackers || []).filter(t => t.status === 'active').length} active tracker
-            {(allTrackers || []).filter(t => t.status === 'active').length !== 1 ? 's' : ''}
-          </p>
+          <div className="py-2">
+            <button
+              onClick={() => setShowCallsInfo(v => !v)}
+              className="w-full flex items-center justify-center gap-1 text-xs text-slate-300 dark:text-slate-600 hover:text-slate-400 dark:hover:text-slate-500"
+            >
+              <Info size={11} className="flex-shrink-0" />
+              Up to ~{totalCalls} API call{totalCalls !== 1 ? 's' : ''}/day across{' '}
+              {(allTrackers || []).filter(t => t.status === 'active').length} active tracker
+              {(allTrackers || []).filter(t => t.status === 'active').length !== 1 ? 's' : ''}
+            </button>
+            {showCallsInfo && (
+              <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-1.5 px-4 leading-relaxed">
+                This is the most you&rsquo;d use if every tracker&rsquo;s recheck interval is hit every time you open the app.
+                Flightwatch doesn&rsquo;t check prices in the background, so real usage is typically lower.
+              </p>
+            )}
+          </div>
         )}
       </div>
 

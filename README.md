@@ -35,7 +35,7 @@ The app runs as a **Next.js server** (serverless-compatible). Deploy to:
 | **Netlify** | Connect repo → build: `npm run build`, publish: `.next` |
 | **Railway / Render / Fly.io** | Dockerfile or `npm run start` |
 
-> **HTTPS required** for PWA installation and push notifications.  
+> **HTTPS required** for PWA installation and notification display.  
 > All major platforms provide this automatically.
 
 ## Why not static export?
@@ -51,7 +51,7 @@ API routes, so `output: 'export'` was removed.
 ### iOS (Safari 16.4+)
 1. Open the deployed HTTPS URL in Safari
 2. Tap Share (⬆) → **Add to Home Screen**
-3. Push notifications only work in the installed (home screen) version
+3. Notifications only work in the installed (home screen) version, and only ever fire in response to a check that happens while the app is open — Flightwatch has no backend server and cannot check fares or notify you while fully closed.
 
 ### Android (Chrome)
 1. Open the deployed HTTPS URL in Chrome

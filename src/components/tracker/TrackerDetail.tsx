@@ -1,14 +1,15 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import dynamic from 'next/dynamic';
 import {
   ArrowLeft, MoreHorizontal, PauseCircle, Play,
-  Trash2, RefreshCw, Bell, BellOff,
+  RefreshCw, Bell, BellOff, Info, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { getDB } from '@/lib/db';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/context/ToastContext';
+import { FREQUENCY_LABEL } from '@/lib/recheck';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
@@ -43,10 +44,6 @@ function fmtDate(iso: string) {
 
 const TRAVEL_CLASS  = ['', 'Economy', 'Premium Economy', 'Business', 'First'];
 const STOPS_LABEL   = ['Any stops', 'Nonstop only', '1 stop or fewer'];
-const FREQ_LABEL: Record<string, string> = {
-  hourly: 'Hourly', '3h': 'Every 3 hours', '6h': 'Every 6 hours',
-  '12h': 'Every 12 hours', daily: 'Daily',
-};
 
 export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerDetailProps) {
   const { goBack }     = useApp();
@@ -54,6 +51,16 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
   const [showDelete, setShowDelete] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
   const [deleting, setDeleting]   = useState(false);
+  const [justChecked, setJustChecked] = useState(false);
+  const justCheckedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isOnline, setIsOnline] = useState(true);
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const on = () => setIsOnline(true), off = () => setIsOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
 
   const history = useLiveQuery(
     () => getDB().priceHistory.where('trackerId').equals(tracker.id).sortBy('fetchedAt'),
@@ -67,6 +74,21 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
     (tracker.alertDirection === 'below' && currentPrice <= tracker.targetPrice) ||
     (tracker.alertDirection === 'above' && currentPrice >= tracker.targetPrice)
   );
+  const lastRecord  = history && history.length > 0 ? history[history.length - 1] : undefined;
+  const lastFailed  = lastRecord?.status === 'error';
+
+  // Was fetching and just finished successfully -> show "Checked just now" for
+  // 30s, during which the Check now button stays disabled (Design Specs v1.3 §4.3).
+  const wasFetching = useRef(false);
+  useEffect(() => {
+    if (wasFetching.current && !isFetching && lastRecord?.status === 'success') {
+      setJustChecked(true);
+      if (justCheckedTimer.current) clearTimeout(justCheckedTimer.current);
+      justCheckedTimer.current = setTimeout(() => setJustChecked(false), 30_000);
+    }
+    wasFetching.current = !!isFetching;
+  }, [isFetching, lastRecord]);
+  useEffect(() => () => { if (justCheckedTimer.current) clearTimeout(justCheckedTimer.current); }, []);
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -110,12 +132,6 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
           {/* Backdrop */}
           <div className="fixed inset-0 z-30" onClick={() => setShowOverflow(false)} />
           <div className="absolute right-0 top-full mt-1 z-40 bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 py-1 min-w-[140px]">
-            <button
-              onClick={() => { setShowOverflow(false); onEdit(); }}
-              className="w-full text-left px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-            >
-              Edit tracker
-            </button>
             <button
               onClick={() => { setShowOverflow(false); setShowDelete(true); }}
               className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -163,6 +179,17 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
             <PauseCircle size={16} className="text-amber-500 flex-shrink-0" />
             <p className="text-sm text-amber-700 dark:text-amber-400">
               Tracking paused. Resume to keep watching this route.
+            </p>
+          </div>
+        )}
+
+        {/* Fetch error banner — last fetch failed. No automatic retry is implied
+            or scheduled; the only way to retry is Check now (Design Specs v1.3 §7.4). */}
+        {lastFailed && !isPaused && (
+          <div className="mx-4 mb-3 px-3 py-2.5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-start gap-2">
+            <AlertTriangle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-700 dark:text-red-400">
+              Last fetch failed{lastRecord?.errorMessage ? ` — ${lastRecord.errorMessage}` : ''}. Tap Check now to retry.
             </p>
           </div>
         )}
@@ -252,9 +279,15 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
                 <Toggle checked={tracker.notificationsEnabled} onChange={handleToggleNotifications} />
               </div>
             </div>
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <p className="text-sm text-slate-900 dark:text-white">Check frequency</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{FREQ_LABEL[tracker.schedule.frequency]}</p>
+            <div className="px-4 py-3.5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-slate-900 dark:text-white">Recheck interval</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{FREQUENCY_LABEL[tracker.schedule.frequency]}</p>
+              </div>
+              <div className="flex items-start gap-1.5 text-xs text-slate-400 dark:text-slate-500 leading-relaxed mt-1.5">
+                <Info size={11} className="flex-shrink-0 mt-0.5" />
+                Checked when you open this tracker or tap Check now — not in the background.
+              </div>
             </div>
             <div className="flex items-center justify-between px-4 py-3.5">
               <p className="text-sm text-slate-900 dark:text-white">Stops filter</p>
@@ -264,18 +297,23 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
         </div>
 
         {/* Actions */}
+        <div className="px-4 mb-3">
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => onFetch(tracker)}
+            disabled={isFetching || justChecked || isPaused || !isOnline}
+          >
+            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
+            {isFetching ? 'Checking…' : justChecked ? 'Checked just now' : 'Check now'}
+          </Button>
+        </div>
         <div className="px-4 flex gap-3 mb-4">
           <Button variant="secondary" className="flex-1" onClick={handleTogglePause}>
             {isPaused ? <><Play size={14} /> Resume</> : <><PauseCircle size={14} /> Pause</>}
           </Button>
-          <Button variant="secondary" className="flex-1" onClick={() => onFetch(tracker)} disabled={isFetching}>
-            <RefreshCw size={14} className={isFetching ? 'animate-spin' : ''} />
-            {isFetching ? 'Checking…' : 'Check now'}
-          </Button>
-        </div>
-        <div className="px-4">
-          <Button variant="destructive" className="w-full" onClick={() => setShowDelete(true)}>
-            <Trash2 size={14} /> Delete tracker
+          <Button variant="primary" className="flex-1" onClick={onEdit}>
+            <Pencil size={14} /> Edit
           </Button>
         </div>
       </div>

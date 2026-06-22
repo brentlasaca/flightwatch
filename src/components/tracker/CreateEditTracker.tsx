@@ -61,8 +61,6 @@ interface FormState {
   targetPrice:         string;
   alertDirection:      'below' | 'above';
   frequency:           FetchFrequency;
-  notificationsEnabled: boolean;
-  cooldownHours:       number;
 }
 
 function nextWeek() { const d = new Date(); d.setDate(d.getDate() + 7);  return d.toISOString().split('T')[0]; }
@@ -76,7 +74,7 @@ const DEFAULT_FORM: FormState = {
   adults: 1, children: 0, infantsSeat: 0, infantsLap: 0,
   travelClass: 1, stops: 0, currency: DEFAULT_CURRENCY,
   targetPrice: '', alertDirection: 'below',
-  frequency: '6h', notificationsEnabled: true, cooldownHours: 6,
+  frequency: '6h',
 };
 
 export function CreateEditTracker({ open, onClose, editTracker, onSaved }: CreateEditTrackerProps) {
@@ -102,8 +100,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
         targetPrice: String(editTracker.targetPrice),
         alertDirection: editTracker.alertDirection,
         frequency: editTracker.schedule.frequency,
-        notificationsEnabled: editTracker.notificationsEnabled,
-        cooldownHours: editTracker.cooldownHours,
       });
     } else {
       setForm(DEFAULT_FORM);
@@ -172,8 +168,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
           alertDirection: form.alertDirection,
           currency: form.currency,
           schedule: { frequency: form.frequency },
-          notificationsEnabled: form.notificationsEnabled,
-          cooldownHours: form.cooldownHours,
           updatedAt: now,
         });
       } else {
@@ -183,8 +177,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
           alertDirection: form.alertDirection,
           currency: form.currency,
           schedule: { frequency: form.frequency },
-          notificationsEnabled: form.notificationsEnabled,
-          cooldownHours: form.cooldownHours,
           status: 'active', createdAt: now, updatedAt: now,
         });
       }

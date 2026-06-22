@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import dynamic from 'next/dynamic';
 import {
   ArrowLeft, MoreHorizontal, PauseCircle, Play,
-  RefreshCw, Bell, BellOff, Info, Pencil, AlertTriangle,
+  RefreshCw, Info, Pencil, AlertTriangle,
 } from 'lucide-react';
 import { getDB } from '@/lib/db';
 import { useApp } from '@/context/AppContext';
@@ -13,7 +13,6 @@ import { FREQUENCY_LABEL } from '@/lib/recheck';
 import { AppHeader } from '@/components/ui/AppHeader';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
-import { Toggle } from '@/components/ui/Toggle';
 import { Button } from '@/components/ui/Button';
 import { PriceInsightsPanel } from './PriceInsightsPanel';
 import type { Tracker } from '@/types';
@@ -105,14 +104,6 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
     const newStatus = isPaused ? 'active' : 'paused';
     await getDB().trackers.update(tracker.id, { status: newStatus, updatedAt: new Date().toISOString() });
     toast(isPaused ? 'Tracking resumed' : 'Tracking paused');
-  };
-
-  const handleToggleNotifications = async () => {
-    await getDB().trackers.update(tracker.id, {
-      notificationsEnabled: !tracker.notificationsEnabled,
-      updatedAt: new Date().toISOString(),
-    });
-    toast(tracker.notificationsEnabled ? 'Notifications off' : 'Notifications on');
   };
 
   const lastChecked = tracker.lastFetchedAt ? fmtDate(tracker.lastFetchedAt) : 'Never';
@@ -267,18 +258,6 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
         <div className="px-4 mb-4">
           <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Tracker settings</h2>
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-700">
-            <div className="flex items-center justify-between px-4 py-3.5">
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">Notifications</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Cooldown: {tracker.cooldownHours}h</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {tracker.notificationsEnabled
-                  ? <Bell size={14} className="text-slate-400" />
-                  : <BellOff size={14} className="text-slate-400" />}
-                <Toggle checked={tracker.notificationsEnabled} onChange={handleToggleNotifications} />
-              </div>
-            </div>
             <div className="px-4 py-3.5">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-slate-900 dark:text-white">Recheck interval</p>

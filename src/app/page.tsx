@@ -124,6 +124,20 @@ function AppContent() {
       <ToastContainer />
       <OfflineIndicator />
       <InstallPrompt />
+      {/*
+        Screen-reader alert announcer (Design Specs v1.4 §9.3).
+        The `aria-live="assertive"` region is the functional replacement for
+        the system notification removed in PRD v1.6 OQ-8. When a price check
+        crosses the alert threshold, announceAlert() injects text here so
+        screen readers announce it without requiring focus navigation.
+      */}
+      <div
+        id="fw-aria-live"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
+        className="sr-only"
+      />
     </div>
   );
 }

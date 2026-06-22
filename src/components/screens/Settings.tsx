@@ -1,7 +1,6 @@
-
 'use client';
 import { useState, useRef } from 'react';
-import { KeyRound, Upload, Download, Moon, Sun, Monitor, ExternalLink, Trash2, Bell } from 'lucide-react';
+import { KeyRound, Upload, Download, Moon, Sun, Monitor, ExternalLink, Trash2 } from 'lucide-react';
 import { getApiKey, saveApiKey, clearApiKey } from '@/lib/crypto';
 import { validateApiKey } from '@/lib/serpapi';
 import { exportData, importData } from '@/lib/export';
@@ -33,12 +32,8 @@ export function Settings() {
   const [showClearData, setShowClearData] = useState(false);
   const [clearingData,  setClearingData]  = useState(false);
 
-  const [testingNotif,  setTestingNotif]  = useState(false);
-
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // BUG FIX: fixed-width masked key — always exactly 6 + 7 dots + 4 chars,
-  // regardless of the actual key length, so the display never overflows.
   const maskedKey = () => {
     const k = getApiKey();
     if (!k) return '—';
@@ -103,51 +98,6 @@ export function Settings() {
     } finally { setClearingData(false); setShowClearData(false); }
   };
 
-  // ── Test notification ─────────────────────────────────────────────────────
-  const handleTestNotification = async () => {
-    setTestingNotif(true);
-    try {
-      if (!('Notification' in window)) {
-        toast('Notifications not supported in this browser', 'error');
-        return;
-      }
-
-      // Request permission if not yet granted
-      let permission = Notification.permission;
-      if (permission === 'default') {
-        permission = await Notification.requestPermission();
-      }
-
-      if (permission === 'denied') {
-        toast('Notifications are blocked. Enable them in your device Settings → Safari → Flightwatch.', 'error');
-        return;
-      }
-
-      // Use service worker showNotification (required on iOS PWA; also works on Android & desktop)
-      if ('serviceWorker' in navigator) {
-        const reg = await navigator.serviceWorker.ready;
-        await reg.showNotification('✈ Flightwatch — Test notification', {
-          body: "Notifications are working! You'll be alerted when a fare hits your target during a check.",
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          tag: 'fw-test',
-        });
-        toast('Test notification sent');
-      } else {
-        // Fallback for browsers without service worker (non-PWA desktop)
-        new Notification('✈ Flightwatch — Test notification', {
-          body: 'Notifications are working!',
-          icon: '/icons/icon-192.png',
-        });
-        toast('Test notification sent');
-      }
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Could not send test notification', 'error');
-    } finally {
-      setTestingNotif(false);
-    }
-  };
-
   return (
     <div className="flex flex-col bg-slate-50 dark:bg-slate-900 pb-24">
       {/* Persistent app header — no right-slot element on Settings */}
@@ -165,36 +115,14 @@ export function Settings() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Theme</p>
             <SegmentedControl
-              options={([
+              options={(([
                 { label: 'Light',  value: 'light'  },
                 { label: 'Dark',   value: 'dark'   },
                 { label: 'System', value: 'system' },
-              ] as { label: string; value: Theme }[])}
+              ]) as { label: string; value: Theme }[])}
               value={theme}
               onChange={setTheme}
             />
-          </div>
-        </section>
-
-        {/* ── Notifications ── */}
-        <section>
-          <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">Notifications</p>
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
-            <button
-              onClick={handleTestNotification}
-              disabled={testingNotif}
-              className="w-full flex items-center gap-3 px-4 py-4 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-left rounded-2xl disabled:opacity-50"
-            >
-              <Bell size={18} className="text-slate-400 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-slate-900 dark:text-white">
-                  {testingNotif ? 'Sending…' : 'Send test notification'}
-                </p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Verify notifications are working on this device
-                </p>
-              </div>
-            </button>
           </div>
         </section>
 
@@ -203,11 +131,6 @@ export function Settings() {
           <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">SerpAPI</p>
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
             <div className="px-4 py-3.5">
-              {/*
-                BUG FIX: min-w-0 on the text container lets the flex layout
-                constrain its width, enabling `truncate` to actually clip the
-                monospace key string instead of overflowing the card.
-              */}
               <div className="flex items-center gap-3 justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-slate-900 dark:text-white">API Key</p>

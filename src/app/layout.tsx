@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Flightwatch',
-  description: 'Track flight prices and get notified when fares drop to your target.',
+  description: 'Track flight prices and see at a glance when fares hit your target.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,

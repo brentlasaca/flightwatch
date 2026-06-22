@@ -1,9 +1,8 @@
-
 'use client';
 import { useCallback, useRef } from 'react';
 import { getDB } from '@/lib/db';
 import { fetchFlightPrice } from '@/lib/serpapi';
-import { showPriceAlert, showQuotaExhaustedNotification } from '@/lib/notifications';
+import { announceAlert } from '@/lib/aria-announce';
 import { isTrackerStale } from '@/lib/recheck';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tracker } from '@/types';
@@ -21,7 +20,7 @@ interface UseFetchResult {
   fetchTracker: (tracker: Tracker) => Promise<{ quotaExhausted?: boolean }>;
   /**
    * Opportunistically rechecks active trackers whose recheck interval has
-   * elapsed (PRD §4.2.3). This is the Home-screen-load batch trigger
+   * elapsed (PRD v1.6 §4.2.2). This is the Home-screen-load batch trigger
    * (PRD §4.2.1, trigger 1) — it must never run on a timer.
    */
   fetchAllActive: (trackers: Tracker[], opts?: FetchAllOptions) => Promise<void>;
@@ -42,16 +41,22 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
 
       if (result.status === 'error' && result.errorMessage === 'quota_exhausted') {
         await db.trackers.update(tracker.id, { status: 'paused', updatedAt: now });
-        showQuotaExhaustedNotification();
         onQuotaExhausted?.();
         return { quotaExhausted: true };
       }
 
       if (result.status === 'success' && result.lowestPrice > 0) {
         const prevPrice = tracker.lastKnownPrice;
-        await db.trackers.update(tracker.id, { lastFetchedAt: now, updatedAt: now, lastKnownPrice: result.lowestPrice });
+        await db.trackers.update(tracker.id, {
+          lastFetchedAt: now,
+          updatedAt: now,
+          lastKnownPrice: result.lowestPrice,
+        });
 
-        // Check alert condition
+        // Detect a false→true targetMet transition (Design Specs v1.4 §6.6).
+        // Notifications have been removed (PRD v1.6 OQ-8). The sole proactive
+        // signal is the in-app visual treatment (amber card / pulse ring) plus
+        // an assertive aria-live announcement for screen-reader users (§9.3).
         const meetsAlert =
           (tracker.alertDirection === 'below' && result.lowestPrice <= tracker.targetPrice) ||
           (tracker.alertDirection === 'above' && result.lowestPrice >= tracker.targetPrice);
@@ -62,22 +67,16 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
             (tracker.alertDirection === 'above' && prevPrice >= tracker.targetPrice)
           );
 
-        const cooldownPassed = !tracker.lastNotifiedAt ||
-          (Date.now() - new Date(tracker.lastNotifiedAt).getTime()) > (tracker.cooldownHours * 3600000);
-
-        if (meetsAlert && !prevMet && cooldownPassed && tracker.notificationsEnabled) {
+        if (meetsAlert && !prevMet) {
           const route = `${tracker.params.departure_id} → ${tracker.params.arrival_id}`;
-          showPriceAlert({
-            trackerName: tracker.name || route,
-            route,
-            currentPrice: result.lowestPrice,
-            targetPrice: tracker.targetPrice,
-            currency: tracker.currency,
-            direction: tracker.alertDirection,
-            priceLevel: result.priceInsights?.price_level,
-            typicalRange: result.priceInsights?.typical_price_range,
+          const dir = tracker.alertDirection === 'below' ? 'at or below' : 'at or above';
+          const fmt = new Intl.NumberFormat('en-US', {
+            style: 'currency', currency: tracker.currency, minimumFractionDigits: 0,
           });
-          await db.trackers.update(tracker.id, { lastNotifiedAt: now });
+          announceAlert(
+            `Alert: ${tracker.name || route} — fare is now ${fmt.format(result.lowestPrice)},` +
+            ` ${dir} your target of ${fmt.format(tracker.targetPrice)}.`
+          );
         }
       } else {
         await db.trackers.update(tracker.id, { lastFetchedAt: now, updatedAt: now });

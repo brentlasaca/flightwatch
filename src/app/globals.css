@@ -107,6 +107,14 @@ body {
 @keyframes range-fill {
   from { width: 0%; }
 }
+@keyframes alert-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  70%  { box-shadow: 0 0 0 12px rgba(245, 158, 11, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+.animate-alert-pulse {
+  animation: alert-pulse 600ms ease-out 1;
+}
 
 .splash-center-circle {
   transform-origin: 120px 120px;

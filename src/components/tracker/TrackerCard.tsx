@@ -1,4 +1,5 @@
 'use client';
+import { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { PauseCircle, Play, Trash2, TrendingDown, TrendingUp, Minus, RefreshCw } from 'lucide-react';
 import { getDB } from '@/lib/db';
@@ -65,6 +66,22 @@ export function TrackerCard({ tracker, onClick, onTogglePause, onDelete, onFetch
   const badgeVariant = targetMet ? 'alert' : isPaused ? 'paused' : 'active';
   const badgeLabel   = targetMet ? '● Alert' : isPaused ? '⏸ Paused' : '● Active';
 
+  // Fire the alert-pulse animation exactly once per false→true targetMet transition
+  // within this session (Design Specs v1.4 §6.2, §6.6). This is the only
+  // proactive attention signal since system notifications were removed (PRD v1.6 OQ-8).
+  const [pulsing, setPulsing] = useState(false);
+  const prevTargetMet = useRef<boolean | undefined>(undefined);
+  useEffect(() => {
+    if (targetMet && prevTargetMet.current === false) {
+      setPulsing(true);
+      const t = setTimeout(() => setPulsing(false), 650);
+      return () => clearTimeout(t);
+    }
+    prevTargetMet.current = targetMet;
+  }, [targetMet]);
+
+  const route = `${tracker.params.departure_id} to ${tracker.params.arrival_id}`;
+
   const lastChecked = tracker.lastFetchedAt
     ? (() => {
         const diff = Date.now() - new Date(tracker.lastFetchedAt).getTime();
@@ -84,8 +101,13 @@ export function TrackerCard({ tracker, onClick, onTogglePause, onDelete, onFetch
       onClick={onClick}
       className={`bg-white dark:bg-slate-800 rounded-2xl border transition-all duration-150 active:scale-[0.985] cursor-pointer shadow-sm overflow-hidden
         ${targetMet ? 'border-amber-400 dark:border-amber-500' : 'border-slate-200 dark:border-slate-700'}
-        ${isPaused ? 'opacity-70' : ''}`}
-      aria-label={`${tracker.params.departure_id} to ${tracker.params.arrival_id} tracker`}
+        ${isPaused ? 'opacity-70' : ''}
+        ${pulsing ? 'animate-alert-pulse' : ''}`}
+      aria-label={
+        targetMet
+          ? `${route} tracker. Alert: fare meets your target.`
+          : `${route} tracker`
+      }
     >
       {targetMet && <div className="h-0.5 bg-amber-400 dark:bg-amber-500 w-full" />}
       <div className="p-4">

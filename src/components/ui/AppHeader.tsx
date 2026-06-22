@@ -3,7 +3,7 @@ import { ReactNode } from 'react';
 import { FlightwatchLogoMark } from './FlightwatchLogo';
 
 interface AppHeaderProps {
-  /** Optional element rendered in the right slot (Bell, overflow menu, etc.) */
+  /** Optional element rendered in the right slot (overflow menu, contextual actions, etc.) */
   right?: ReactNode;
 }
 

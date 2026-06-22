@@ -47,14 +47,16 @@ export interface Tracker {
   targetPrice: number;
   alertDirection: AlertDirection;
   currency: string;
+  /**
+   * Recheck interval configuration — PRD v1.6 §4.2.2.
+   * This is a staleness threshold, not a background schedule.
+   * Checks only happen at the three app-open triggers.
+   */
   schedule: Schedule;
-  notificationsEnabled: boolean;
-  cooldownHours: number;
   status: TrackerStatus;
   createdAt: string;
   updatedAt: string;
   lastFetchedAt?: string;
-  lastNotifiedAt?: string;
   lastKnownPrice?: number;
 }
 

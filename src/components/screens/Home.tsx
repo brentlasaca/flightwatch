@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Bell, BellOff, Info } from 'lucide-react';
+import { Search, Info } from 'lucide-react';
 import { getDB, pruneOldHistory } from '@/lib/db';
 import { estimateDailyApiCalls } from '@/lib/serpapi';
 import { useApp } from '@/context/AppContext';
@@ -22,9 +22,6 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   const { toast } = useToast();
   const [search, setSearch]     = useState('');
   const [sort, setSort]         = useState<SortMode>('updated');
-  const [muteAll, setMuteAll]   = useState(
-    () => typeof window !== 'undefined' && localStorage.getItem('fw_mute_all') === '1'
-  );
   const [deleteTarget, setDeleteTarget] = useState<Tracker | null>(null);
   const [deleting, setDeleting]         = useState(false);
   const [fetchingIds, setFetchingIds]   = useState<Set<string>>(new Set());
@@ -72,13 +69,6 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
     } finally { setDeleting(false); setDeleteTarget(null); }
   }, [deleteTarget, toast]);
 
-  const toggleMuteAll = useCallback(() => {
-    const next = !muteAll;
-    setMuteAll(next);
-    localStorage.setItem('fw_mute_all', next ? '1' : '0');
-    toast(next ? 'All notifications muted' : 'Notifications enabled');
-  }, [muteAll, toast]);
-
   const cycleSort = () => {
     const order: SortMode[] = ['updated', 'price', 'name'];
     setSort(prev => order[(order.indexOf(prev) + 1) % order.length]);
@@ -106,22 +96,10 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
     .filter(t => t.status === 'active')
     .reduce((sum, t) => sum + estimateDailyApiCalls(t.schedule.frequency), 0);
 
-  /* Bell button for the header right slot */
-  const bellAction = (
-    <button
-      onClick={toggleMuteAll}
-      aria-label={muteAll ? 'Unmute notifications' : 'Mute all notifications'}
-      className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-    >
-      {muteAll ? <BellOff size={18} /> : <Bell size={18} />}
-    </button>
-  );
-
   return (
     <div className="flex flex-col bg-slate-50 dark:bg-slate-900 pb-20">
-      {/* Persistent header with logo + Bell — sticky relative to <main>'s
-          scrollport in page.tsx, which is now the single true scroll region. */}
-      <AppHeader right={bellAction} />
+      {/* App header — no right-slot element (Bell removed per PRD v1.6) */}
+      <AppHeader />
 
       {/* Search */}
       <div className="px-4 pt-4 pb-3">
@@ -159,7 +137,6 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
             <button onClick={() => setSearch('')} className="text-sky-500 text-sm">Clear search</button>
           </div>
         ) : allTrackers.length === 0 ? (
-          /* Empty state — uses Flightwatch logo mark per design specs §7.1 */
           <div className="flex flex-col items-center py-20 gap-3 text-slate-400">
             <FlightwatchLogoMark size={64} className="opacity-40" />
             <p className="text-lg font-medium text-slate-500 dark:text-slate-400">No trackers yet</p>

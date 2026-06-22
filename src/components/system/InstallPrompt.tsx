@@ -70,11 +70,11 @@ export function InstallPrompt() {
           <p className="text-sm font-semibold text-slate-900 dark:text-white">Install Flightwatch</p>
           {platform === 'ios' ? (
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-              Tap <Share size={11} className="inline" /> then <strong>&ldquo;Add to Home Screen&rdquo;</strong> for the best experience and notifications.
+              Tap <Share size={11} className="inline" /> then <strong>&ldquo;Add to Home Screen&rdquo;</strong> for the best experience.
             </p>
           ) : (
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
-              Runs offline · Notifies you on price drops · Works like a native app.
+              Runs offline · See alert when price hits your target · Works like a native app.
             </p>
           )}
         </div>

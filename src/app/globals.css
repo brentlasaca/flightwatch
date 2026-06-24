@@ -49,6 +49,7 @@ body {
   --price-level-high-text:   #fef2f2;
   --price-range-track:       #E2E8F0;
   --price-range-fill:        #3B82F6;
+  --airline-logo-border:     #E2E8F0; /* contains white logo bg — do not theme to dark */
 }
 .dark {
   --price-level-low-bg:      #166534;
@@ -59,6 +60,7 @@ body {
   --price-level-high-text:   #fecaca;
   --price-range-track:       #374151;
   --price-range-fill:        #60A5FA;
+  --airline-logo-border:     #374151; /* border-default dark; logo bg stays white */
 }
 
 .price-level-badge {

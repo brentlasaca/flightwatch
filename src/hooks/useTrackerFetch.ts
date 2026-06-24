@@ -47,16 +47,18 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
 
       if (result.status === 'success' && result.lowestPrice > 0) {
         const prevPrice = tracker.lastKnownPrice;
+        // Write airline fields atomically alongside price (PRD v1.7 §4.10.1)
         await db.trackers.update(tracker.id, {
           lastFetchedAt: now,
           updatedAt: now,
           lastKnownPrice: result.lowestPrice,
+          lastKnownAirline:     result.lowestPriceAirline     ?? undefined,
+          lastKnownAirlineLogo: result.lowestPriceAirlineLogo ?? undefined,
         });
 
-        // Detect a false→true targetMet transition (Design Specs v1.4 §6.6).
-        // Notifications have been removed (PRD v1.6 OQ-8). The sole proactive
-        // signal is the in-app visual treatment (amber card / pulse ring) plus
-        // an assertive aria-live announcement for screen-reader users (§9.3).
+        // Detect a false→true targetMet transition (Design Specs v1.5 §6.6).
+        // No system notification (PRD v1.6 OQ-8). Sole proactive signals are:
+        // the amber card visual treatment + the aria-live assertive announcement.
         const meetsAlert =
           (tracker.alertDirection === 'below' && result.lowestPrice <= tracker.targetPrice) ||
           (tracker.alertDirection === 'above' && result.lowestPrice >= tracker.targetPrice);
@@ -73,8 +75,10 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
           const fmt = new Intl.NumberFormat('en-US', {
             style: 'currency', currency: tracker.currency, minimumFractionDigits: 0,
           });
+          // Include airline so screen-reader users know where to book (Design Specs v1.5 §9.6)
+          const airlinePart = result.lowestPriceAirline ? ` via ${result.lowestPriceAirline}` : '';
           announceAlert(
-            `Alert: ${tracker.name || route} — fare is now ${fmt.format(result.lowestPrice)},` +
+            `Alert: ${tracker.name || route} — fare is now ${fmt.format(result.lowestPrice)}${airlinePart},` +
             ` ${dir} your target of ${fmt.format(tracker.targetPrice)}.`
           );
         }

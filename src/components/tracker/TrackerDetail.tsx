@@ -15,6 +15,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PriceInsightsPanel } from './PriceInsightsPanel';
+import { AirlineLogo } from './AirlineLogo';
 import type { Tracker } from '@/types';
 
 const PriceChart = dynamic(() => import('./PriceChart'), {
@@ -200,9 +201,29 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
                 {fmt(currentPrice, tracker.currency)}
               </div>
               {targetMet && (
-                <p className="text-sm text-amber-600 dark:text-amber-400 font-medium mt-1">
+                <p className="text-sm text-amber-600 dark:text-amber-400 font-medium mt-1" role="status">
                   ✓ This fare {tracker.alertDirection === 'below' ? 'dropped below' : 'rose above'} your target
                 </p>
+              )}
+
+              {/* Airline attribution — Design Specs v1.5 §4.3 / §5.10.
+                  Visible in both normal and alert states. No amber treatment —
+                  this is the booking cue: tells the user which airline to visit. */}
+              {(tracker.lastKnownAirline || tracker.lastKnownAirlineLogo) && (
+                <div className="mt-3">
+                  <AirlineLogo
+                    name={tracker.lastKnownAirline}
+                    logoUrl={tracker.lastKnownAirlineLogo}
+                    size="detail"
+                    flightNumber={
+                      // Pull from the most recent successful history record
+                      [...(history || [])]
+                        .reverse()
+                        .find(r => r.status === 'success')
+                        ?.lowestPriceFlightNumber
+                    }
+                  />
+                </div>
               )}
             </>
           ) : (

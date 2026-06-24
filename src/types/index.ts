@@ -48,9 +48,8 @@ export interface Tracker {
   alertDirection: AlertDirection;
   currency: string;
   /**
-   * Recheck interval configuration — PRD v1.6 §4.2.2.
-   * This is a staleness threshold, not a background schedule.
-   * Checks only happen at the three app-open triggers.
+   * Recheck interval — PRD v1.7 §4.2.2. Staleness threshold only.
+   * Checks only at the three app-open triggers.
    */
   schedule: Schedule;
   status: TrackerStatus;
@@ -58,6 +57,10 @@ export interface Tracker {
   updatedAt: string;
   lastFetchedAt?: string;
   lastKnownPrice?: number;
+  /** Airline name for the most recently fetched lowest fare (PRD v1.7 §4.5.2). */
+  lastKnownAirline?: string;
+  /** Airline logo URL for the most recently fetched lowest fare (PRD v1.7 §4.5.2). */
+  lastKnownAirlineLogo?: string;
 }
 
 /** Price insights returned by Google Flights API */
@@ -78,6 +81,12 @@ export interface PriceRecord {
   status: FetchStatus;
   errorMessage?: string;
   priceInsights?: PriceInsights;
+  /** Airline name for cheapest itinerary first segment (PRD v1.7 §4.10.1). */
+  lowestPriceAirline?: string;
+  /** Airline logo URL for cheapest itinerary first segment (PRD v1.7 §4.10.1). */
+  lowestPriceAirlineLogo?: string;
+  /** Flight number for cheapest itinerary first segment (PRD v1.7 §4.10.3). */
+  lowestPriceFlightNumber?: string;
 }
 
 export interface SerpFlight {

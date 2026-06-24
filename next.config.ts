@@ -42,10 +42,32 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  // Static export removed — Next.js API routes require a server.
-  // Deploy with `npm run start` locally, or to Vercel / Netlify / any
-  // Node-capable platform. The app is still a fully-installable PWA.
   images: { unoptimized: true },
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            // img-src includes https://www.gstatic.com for airline logo images
+            // served by Google's CDN (PRD v1.7 §4.10.5 / §6.4).
+            // All other origins are same-origin only.
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline'", // Next.js requires unsafe-eval in dev; tighten in prod if needed
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https://www.gstatic.com",
+              "connect-src 'self'",
+              "font-src 'self'",
+              "worker-src 'self' blob:",
+              "manifest-src 'self'",
+            ].join('; '),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);

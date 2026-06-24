@@ -6,6 +6,7 @@ import { getDB } from '@/lib/db';
 import { Sparkline } from './Sparkline';
 import { PriceLevelBadge } from './PriceLevelBadge';
 import { TypicalPriceRangeBar } from './TypicalPriceRangeBar';
+import { AirlineLogo } from './AirlineLogo';
 import { Badge } from '@/components/ui/Badge';
 import type { Tracker, PriceInsights } from '@/types';
 
@@ -103,11 +104,11 @@ export function TrackerCard({ tracker, onClick, onTogglePause, onDelete, onFetch
         ${targetMet ? 'border-amber-400 dark:border-amber-500' : 'border-slate-200 dark:border-slate-700'}
         ${isPaused ? 'opacity-70' : ''}
         ${pulsing ? 'animate-alert-pulse' : ''}`}
-      aria-label={
-        targetMet
-          ? `${route} tracker. Alert: fare meets your target.`
-          : `${route} tracker`
-      }
+      aria-label={[
+        `${route} tracker`,
+        targetMet ? 'Alert: fare meets your target.' : null,
+        tracker.lastKnownAirline ? `${tracker.lastKnownAirline}.` : null,
+      ].filter(Boolean).join(' ')}
     >
       {targetMet && <div className="h-0.5 bg-amber-400 dark:bg-amber-500 w-full" />}
       <div className="p-4">
@@ -158,7 +159,19 @@ export function TrackerCard({ tracker, onClick, onTogglePause, onDelete, onFetch
                   </div>
                 )}
 
-                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                {/* Airline attribution row — Design Specs v1.5 §5.1 / §5.10.
+                    No amber treatment in alert state: this row is the booking cue. */}
+                {(tracker.lastKnownAirline || tracker.lastKnownAirlineLogo) && (
+                  <div className="mt-1.5">
+                    <AirlineLogo
+                      name={tracker.lastKnownAirline}
+                      logoUrl={tracker.lastKnownAirlineLogo}
+                      size="card"
+                    />
+                  </div>
+                )}
+
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
                   Target: {tracker.alertDirection === 'below' ? '≤' : '≥'} {formatPrice(tracker.targetPrice, tracker.currency)}
                 </p>
               </>

@@ -4,10 +4,17 @@ import { v4 as uuidv4 } from 'uuid';
 
 const PROXY = '/api/flights';
 
+interface SerpAPIFlightSegment {
+  airline?: string;
+  airline_logo?: string;
+  flight_number?: string;
+  duration?: number;
+}
+
 interface SerpAPIFlightResult {
   price?: number;
   total_duration?: number;
-  flights?: Array<{ airline?: string; duration?: number }>;
+  flights?: SerpAPIFlightSegment[];
   layovers?: unknown[];
 }
 
@@ -128,8 +135,19 @@ export async function fetchFlightPrice(
       return { ...base, lowestPrice: 0, flights: [], status: 'no_results' };
     }
 
-    const sorted     = [...withPrice].sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
-    const lowestPrice = sorted[0].price ?? 0;
+    const sorted      = [...withPrice].sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+    const lowestItinerary = sorted[0];
+    const lowestPrice = lowestItinerary.price ?? 0;
+
+    // Airline attribution: extract from first segment of the cheapest itinerary.
+    // PRD v1.7 §4.10.1 — use flights[0] of the cheapest entry in best_flights
+    // (falling back to other_flights). Absent fields default to undefined so
+    // callers can distinguish "not available" from an empty string.
+    const firstSeg = lowestItinerary.flights?.[0];
+    const lowestPriceAirline      = firstSeg?.airline      || undefined;
+    const lowestPriceAirlineLogo  = firstSeg?.airline_logo || undefined;
+    const lowestPriceFlightNumber = firstSeg?.flight_number || undefined;
+
     const flights: SerpFlight[] = sorted.slice(0, 5).map(f => ({
       price:    f.price ?? 0,
       airline:  f.flights?.[0]?.airline,
@@ -139,7 +157,10 @@ export async function fetchFlightPrice(
 
     const priceInsights = parsePriceInsights(data.price_insights);
 
-    return { ...base, lowestPrice, flights, status: 'success', priceInsights };
+    return {
+      ...base, lowestPrice, flights, status: 'success', priceInsights,
+      lowestPriceAirline, lowestPriceAirlineLogo, lowestPriceFlightNumber,
+    };
   } catch (e) {
     return {
       ...base, lowestPrice: 0, flights: [], status: 'error',

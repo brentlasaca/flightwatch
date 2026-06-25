@@ -27,6 +27,10 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   const [fetchingIds, setFetchingIds]   = useState<Set<string>>(new Set());
   const [showCallsInfo, setShowCallsInfo] = useState(false);
   const didInitFetch = useRef(false);
+  // Tracks every tracker ID that has already been handled by either the initial
+  // batch fetch or the new-tracker effect below. Seeded synchronously inside
+  // the didInitFetch effect so the two effects never double-fetch on first load.
+  const seenTrackerIds = useRef<Set<string>>(new Set());
 
   const handleQuota = useCallback(() => {
     setQuotaExhausted(true);
@@ -36,15 +40,43 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   const { fetchTracker, fetchAllActive } = useTrackerFetch(handleQuota);
   const allTrackers = useLiveQuery(() => getDB().trackers.orderBy('updatedAt').reverse().toArray(), []);
 
+  // Trigger 1: opportunistic recheck of stale active trackers on Home open.
   useEffect(() => {
     if (didInitFetch.current || !allTrackers) return;
     didInitFetch.current = true;
+    // Seed seen-set with every tracker that exists right now so the effect
+    // below doesn't double-fetch any of them on the same render.
+    allTrackers.forEach(t => seenTrackerIds.current.add(t.id));
     pruneOldHistory().catch(console.warn);
     fetchAllActive(allTrackers, {
       onTrackerStart: id => setFetchingIds(prev => new Set([...prev, id])),
       onTrackerEnd:   id => setFetchingIds(prev => { const n = new Set(prev); n.delete(id); return n; }),
     });
   }, [allTrackers, fetchAllActive]);
+
+  // Bug fix: auto-fetch newly created trackers that appear in allTrackers after
+  // the initial batch has already run (i.e. user created a tracker and navigated
+  // back to Home). The live query fires every time the trackers table changes, so
+  // seenTrackerIds is the guard that makes this a no-op for IDs already handled.
+  useEffect(() => {
+    if (!didInitFetch.current || !allTrackers) return;
+
+    const newUnfetched = allTrackers.filter(
+      t => !seenTrackerIds.current.has(t.id) && t.status === 'active' && !t.lastFetchedAt
+    );
+
+    // Always mark every current ID as seen, regardless of whether we fetch,
+    // so subsequent live-query updates (e.g. lastFetchedAt being written back)
+    // don't re-enter this branch.
+    allTrackers.forEach(t => seenTrackerIds.current.add(t.id));
+
+    for (const t of newUnfetched) {
+      setFetchingIds(prev => new Set([...prev, t.id]));
+      fetchTracker(t).then(() => {
+        setFetchingIds(prev => { const n = new Set(prev); n.delete(t.id); return n; });
+      });
+    }
+  }, [allTrackers, fetchTracker]);
 
   const handleFetch = useCallback(async (tracker: Tracker) => {
     setFetchingIds(prev => new Set([...prev, tracker.id]));

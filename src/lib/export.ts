@@ -1,19 +1,28 @@
 
 import type { Tracker, PriceRecord } from '@/types';
 import { getDB } from './db';
+import { getDefaultsForExport, applyImportedDefaults } from './trackerDefaults';
 
 export interface ExportData {
   version: '1.0';
   exportedAt: string;
   trackers: Tracker[];
   priceHistory: PriceRecord[];
+  /** Tracker creation defaults (PRD v1.8 §4.11.6). */
+  settings?: Record<string, string>;
 }
 
 export async function exportData(): Promise<void> {
   const db = getDB();
   const trackers = await db.trackers.toArray();
   const priceHistory = await db.priceHistory.toArray();
-  const data: ExportData = { version: '1.0', exportedAt: new Date().toISOString(), trackers, priceHistory };
+  const data: ExportData = {
+    version: '1.0',
+    exportedAt: new Date().toISOString(),
+    trackers,
+    priceHistory,
+    settings: getDefaultsForExport(),
+  };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -36,8 +45,15 @@ export async function importData(
   if (mode === 'replace') {
     await db.trackers.clear();
     await db.priceHistory.clear();
-  }
-  if (mode === 'merge') {
+    // Apply imported defaults only on full replace (PRD §4.11.6)
+    if (data.settings && typeof data.settings === 'object') {
+      applyImportedDefaults(data.settings as Record<string, string>);
+    }
+    await db.trackers.bulkAdd(data.trackers);
+    await db.priceHistory.bulkAdd(data.priceHistory || []);
+    return { trackers: data.trackers.length, records: (data.priceHistory || []).length };
+  } else {
+    // Merge: existing locally-set defaults are preserved; imported defaults ignored (PRD §4.11.6)
     const existingIds = new Set(await db.trackers.toCollection().primaryKeys());
     const newTrackers = data.trackers.filter((t: Tracker) => !existingIds.has(t.id));
     await db.trackers.bulkAdd(newTrackers);
@@ -45,9 +61,5 @@ export async function importData(
     const newRecords = (data.priceHistory || []).filter((r: PriceRecord) => !existingRecIds.has(r.id));
     await db.priceHistory.bulkAdd(newRecords);
     return { trackers: newTrackers.length, records: newRecords.length };
-  } else {
-    await db.trackers.bulkAdd(data.trackers);
-    await db.priceHistory.bulkAdd(data.priceHistory || []);
-    return { trackers: data.trackers.length, records: (data.priceHistory || []).length };
   }
 }

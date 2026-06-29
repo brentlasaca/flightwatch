@@ -1,9 +1,11 @@
 'use client';
 import { useState, useRef } from 'react';
-import { KeyRound, Upload, Download, Moon, Sun, Monitor, ExternalLink, Trash2 } from 'lucide-react';
+import { KeyRound, Upload, Download, ExternalLink, Trash2 } from 'lucide-react';
 import { getApiKey, saveApiKey, clearApiKey } from '@/lib/crypto';
 import { validateApiKey } from '@/lib/serpapi';
 import { exportData, importData } from '@/lib/export';
+import { getTrackerDefaults, resetTrackerDefaults } from '@/lib/trackerDefaults';
+import type { TrackerDefaults } from '@/lib/trackerDefaults';
 import { useTheme } from '@/hooks/useTheme';
 import { useApp } from '@/context/AppContext';
 import { useToast } from '@/context/ToastContext';
@@ -11,12 +13,16 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { AppHeader } from '@/components/ui/AppHeader';
+import { TrackerDefaultsPanel } from '@/components/tracker/TrackerDefaultsPanel';
 import type { Theme } from '@/types';
 
 export function Settings() {
   const { theme, setTheme } = useTheme();
   const { navigate }        = useApp();
   const { toast }           = useToast();
+
+  /* Tracker defaults state — initialised from localStorage */
+  const [trackerDefaults, setTrackerDefaults] = useState<TrackerDefaults>(() => getTrackerDefaults());
 
   const [changingKey,   setChangingKey]   = useState(false);
   const [newKey,        setNewKey]        = useState('');
@@ -79,6 +85,8 @@ export function Settings() {
       const result = await importData(importFile, importMode);
       setShowImport(false);
       setImportFile(null);
+      // Refresh defaults in UI if a "replace" import brought in new defaults
+      if (importMode === 'replace') setTrackerDefaults(getTrackerDefaults());
       toast(`Imported ${result.trackers} tracker${result.trackers !== 1 ? 's' : ''} and ${result.records} price records`);
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Import failed', 'error');
@@ -93,6 +101,9 @@ export function Settings() {
       await db.trackers.clear();
       await db.priceHistory.clear();
       clearApiKey();
+      // Reset all defaults as part of "Clear all data" (PRD §4.11.6)
+      resetTrackerDefaults();
+      setTrackerDefaults(getTrackerDefaults());
       toast('All data cleared');
       navigate('onboarding');
     } finally { setClearingData(false); setShowClearData(false); }
@@ -115,16 +126,24 @@ export function Settings() {
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Theme</p>
             <SegmentedControl
-              options={(([
+              options={([
                 { label: 'Light',  value: 'light'  },
                 { label: 'Dark',   value: 'dark'   },
                 { label: 'System', value: 'system' },
-              ]) as { label: string; value: Theme }[])}
+              ] as { label: string; value: Theme }[])}
               value={theme}
               onChange={setTheme}
             />
           </div>
         </section>
+
+        {/* ── Tracker Defaults (PRD v1.8 §4.11) ── */}
+        <TrackerDefaultsPanel
+          defaults={trackerDefaults}
+          onChanged={updated => {
+            setTrackerDefaults(updated);
+          }}
+        />
 
         {/* ── SerpAPI ── */}
         <section>
@@ -175,7 +194,7 @@ export function Settings() {
               <Upload size={18} className="text-slate-400 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-slate-900 dark:text-white">Export data</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Download all trackers and price history</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Download all trackers, history, and defaults</p>
               </div>
             </button>
             <button onClick={() => fileRef.current?.click()}
@@ -199,7 +218,7 @@ export function Settings() {
               <Trash2 size={18} className="text-red-400 flex-shrink-0" />
               <div>
                 <p className="text-sm font-medium text-red-500">Clear all data</p>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Delete all trackers, history, and API key</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">Delete all trackers, history, defaults, and API key</p>
               </div>
             </button>
           </div>
@@ -240,7 +259,9 @@ export function Settings() {
                       {mode === 'merge' ? 'Merge with existing data' : 'Replace all my data'}
                     </p>
                     <p className="text-xs text-slate-400 dark:text-slate-500">
-                      {mode === 'merge' ? 'New trackers added; existing unchanged' : 'All current trackers and history deleted'}
+                      {mode === 'merge'
+                        ? 'New trackers added; existing unchanged; your defaults preserved'
+                        : 'All trackers, history, and defaults replaced from file'}
                     </p>
                   </div>
                 </label>
@@ -253,7 +274,7 @@ export function Settings() {
       <Modal
         open={showClearData}
         title="Clear all data?"
-        description="This will permanently delete all trackers, price history, and your API key. This cannot be undone."
+        description="This will permanently delete all trackers, price history, tracker defaults, and your API key. This cannot be undone."
         confirmLabel="Clear everything"
         confirmVariant="destructive"
         onConfirm={handleClearAll}

@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { ArrowLeftRight, Info } from 'lucide-react';
 import { getDB } from '@/lib/db';
 import { estimateDailyApiCalls } from '@/lib/serpapi';
-import { CURRENCY_OPTIONS, DEFAULT_CURRENCY, getCurrencySymbol } from '@/data/currencies';
+import { CURRENCY_OPTIONS, getCurrencySymbol } from '@/data/currencies';
+import { LANGUAGES } from '@/data/languages';
+import { getTrackerDefaults } from '@/lib/trackerDefaults';
 import { AirportAutocomplete } from './AirportAutocomplete';
 import { BottomSheet } from '@/components/ui/BottomSheet';
 import { Button } from '@/components/ui/Button';
@@ -22,18 +24,18 @@ interface CreateEditTrackerProps {
 }
 
 const FREQUENCIES: { label: string; value: FetchFrequency }[] = [
-  { label: 'Hourly',       value: 'hourly' },
-  { label: 'Every 3h',    value: '3h'     },
-  { label: 'Every 6h',    value: '6h'     },
-  { label: 'Every 12h',   value: '12h'    },
-  { label: 'Daily',       value: 'daily'  },
+  { label: 'Every hour',    value: 'hourly' },
+  { label: 'Every 3 hours', value: '3h'     },
+  { label: 'Every 6 hours', value: '6h'     },
+  { label: 'Every 12 hours',value: '12h'    },
+  { label: 'Once a day',    value: 'daily'  },
 ];
 
 const CLASS_OPTIONS = [
-  { label: 'Economy',    value: 1 as TravelClass },
-  { label: 'Prem. Eco', value: 2 as TravelClass },
-  { label: 'Business',  value: 3 as TravelClass },
-  { label: 'First',     value: 4 as TravelClass },
+  { label: 'Economy',         value: 1 as TravelClass },
+  { label: 'Premium Economy', value: 2 as TravelClass },
+  { label: 'Business',        value: 3 as TravelClass },
+  { label: 'First',           value: 4 as TravelClass },
 ];
 
 const STOPS_OPTIONS = [
@@ -43,48 +45,58 @@ const STOPS_OPTIONS = [
 ];
 
 interface FormState {
-  name:                string;
-  tripType:            TripType;
-  departureId:         string;
-  departureName:       string;
-  arrivalId:           string;
-  arrivalName:         string;
-  outboundDate:        string;
-  returnDate:          string;
-  adults:              number;
-  children:            number;
-  infantsSeat:         number;
-  infantsLap:          number;
-  travelClass:         TravelClass;
-  stops:               number;
-  currency:            string;
-  targetPrice:         string;
-  alertDirection:      'below' | 'above';
-  frequency:           FetchFrequency;
+  name:            string;
+  tripType:        TripType;
+  departureId:     string;
+  departureName:   string;
+  arrivalId:       string;
+  arrivalName:     string;
+  outboundDate:    string;
+  returnDate:      string;
+  adults:          number;
+  children:        number;
+  infantsSeat:     number;
+  infantsLap:      number;
+  travelClass:     TravelClass;
+  stops:           number;
+  currency:        string;
+  language:        string;
+  targetPrice:     string;
+  alertDirection:  'below' | 'above';
+  frequency:       FetchFrequency;
 }
 
 function nextWeek() { const d = new Date(); d.setDate(d.getDate() + 7);  return d.toISOString().split('T')[0]; }
 function twoWeeks() { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().split('T')[0]; }
 function today()    { return new Date().toISOString().split('T')[0]; }
 
-const DEFAULT_FORM: FormState = {
-  name: '', tripType: 1,
-  departureId: '', departureName: '', arrivalId: '', arrivalName: '',
-  outboundDate: nextWeek(), returnDate: twoWeeks(),
-  adults: 1, children: 0, infantsSeat: 0, infantsLap: 0,
-  travelClass: 1, stops: 0, currency: DEFAULT_CURRENCY,
-  targetPrice: '', alertDirection: 'below',
-  frequency: '6h',
-};
+/** Build the form's initial state from user defaults (create mode) or system defaults. */
+function buildDefaultForm(): FormState {
+  const d = getTrackerDefaults();
+  return {
+    name: '', tripType: d.defaultTripType,
+    departureId: '', departureName: '', arrivalId: '', arrivalName: '',
+    outboundDate: nextWeek(), returnDate: twoWeeks(),
+    adults: d.defaultAdults, children: 0, infantsSeat: 0, infantsLap: 0,
+    travelClass: d.defaultTravelClass,
+    stops: d.defaultStops,
+    currency: d.defaultCurrency,
+    language: d.defaultLanguage,
+    targetPrice: '',
+    alertDirection: d.defaultAlertDirection,
+    frequency: d.defaultRecheckInterval,
+  };
+}
 
 export function CreateEditTracker({ open, onClose, editTracker, onSaved }: CreateEditTrackerProps) {
-  const [form,   setForm]   = useState<FormState>(DEFAULT_FORM);
+  const [form,   setForm]   = useState<FormState>(buildDefaultForm);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
   useEffect(() => {
     if (!open) return;
     if (editTracker) {
+      // Edit mode: always pre-populate from the tracker's own saved values (PRD §4.11.5)
       const p = editTracker.params;
       setForm({
         name: editTracker.name || '',
@@ -95,14 +107,17 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
         returnDate:   p.return_date || twoWeeks(),
         adults: p.adults, children: p.children,
         infantsSeat: p.infants_in_seat, infantsLap: p.infants_on_lap,
-        travelClass: p.travel_class, stops: p.stops,
+        travelClass: p.travel_class,
+        stops: p.stops,
         currency: editTracker.currency,
+        language: p.hl || 'en',
         targetPrice: String(editTracker.targetPrice),
         alertDirection: editTracker.alertDirection,
         frequency: editTracker.schedule.frequency,
       });
     } else {
-      setForm(DEFAULT_FORM);
+      // Create mode: pre-populate from user's stored defaults (PRD §4.11.4)
+      setForm(buildDefaultForm());
     }
     setErrors({});
   }, [open, editTracker]);
@@ -159,7 +174,7 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
         infants_on_lap:  form.infantsLap,
         travel_class:    form.travelClass,
         stops:           form.stops as 0 | 1 | 2,
-        hl:              'en',
+        hl:              form.language,
       };
       if (editTracker) {
         await db.trackers.update(editTracker.id, {
@@ -216,13 +231,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
 
         {/* ── Airport fields ── */}
         <div className="px-4 pt-3">
-          {/*
-            BUG FIX: The swap button is now a sibling element between the two
-            AirportAutocomplete instances, not buried inside one of them.
-            - `items-end` aligns the button with the bottom of the input fields
-              (below the label text on top of each field).
-            - Each autocomplete is wrapped in min-w-0 to prevent width overflow.
-          */}
           <div className="flex items-end gap-2">
             <div className="flex-1 min-w-0">
               <AirportAutocomplete
@@ -232,7 +240,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
                 onChange={(iata, name) => { set('departureId', iata); set('departureName', name); }}
               />
             </div>
-
             <button
               type="button"
               onClick={handleSwap}
@@ -250,7 +257,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
             >
               <ArrowLeftRight size={14} />
             </button>
-
             <div className="flex-1 min-w-0">
               <AirportAutocomplete
                 label="To"
@@ -260,7 +266,6 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
               />
             </div>
           </div>
-
           {errors.departureId && <p className="text-xs text-red-500 mt-1">{errors.departureId}</p>}
           {errors.arrivalId   && <p className="text-xs text-red-500 mt-1">{errors.arrivalId}</p>}
         </div>
@@ -320,6 +325,15 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
                 ))}
               </select>
             </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-200 block mb-1">Language</label>
+              <select value={form.language} onChange={e => set('language', e.target.value)}
+                className="w-full px-3 py-3 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-sky-500">
+                {LANGUAGES.map(l => (
+                  <option key={l.code} value={l.code}>{l.name} ({l.code})</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -358,7 +372,7 @@ export function CreateEditTracker({ open, onClose, editTracker, onSaved }: Creat
             Checked when you open this tracker, open Home, or tap Check now — not on a timer in the background.
           </div>
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            Up to ~{dailyCalls} API call{dailyCalls !== 1 ? 's' : ''}/day
+            Up to ~{dailyCalls} API call{dailyCalls !== 1 ? 's' : ''}/day for this tracker
           </p>
         </div>
 

@@ -3,6 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
   ResponsiveContainer, CartesianGrid, Label,
 } from 'recharts';
+import { ChartTooltip } from './ChartTooltip';
 import type { PriceRecord } from '@/types';
 
 interface PriceChartProps {
@@ -11,51 +12,24 @@ interface PriceChartProps {
   targetPrice: number;
 }
 
-interface TooltipPayload {
-  value?: number;
-}
+const fmtTick = (ms: number) =>
+  new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-interface CustomTooltipProps {
-  active?: boolean;
-  payload?: TooltipPayload[];
-  label?: string;
-  currency: string;
-}
-
-function CustomTooltip({ active, payload, label, currency }: CustomTooltipProps) {
-  if (!active || !payload?.length) return null;
-  const price = payload[0]?.value;
-  const fmt = (v: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency', currency,
-      minimumFractionDigits: 0, maximumFractionDigits: 0,
-    }).format(v);
-  return (
-    <div style={{
-      background: 'white', border: '1px solid #E2E8F0',
-      borderRadius: 8, padding: '6px 10px', fontSize: 12,
-    }}>
-      <p style={{ color: '#64748B', marginBottom: 2 }}>{label}</p>
-      {price !== undefined && (
-        <p style={{ fontWeight: 600, color: '#0F172A' }}>{fmt(price)}</p>
-      )}
-    </div>
-  );
-}
+const fmtPrice = (v: number, currency: string) =>
+  new Intl.NumberFormat(undefined, {
+    style: 'currency', currency,
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
+  }).format(v);
 
 export default function PriceChart({ data, currency, targetPrice }: PriceChartProps) {
-  const fmt = (v: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency', currency,
-      minimumFractionDigits: 0, maximumFractionDigits: 0,
-    }).format(v);
-
-  const fmtDate = (iso: string) =>
-    new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
+  // Use millisecond timestamp as the unique x-axis key so multiple records
+  // on the same calendar day each get their own distinct point and tooltip.
   const chartData = data.map(r => ({
-    date: fmtDate(r.fetchedAt),
+    time: new Date(r.fetchedAt).getTime(), // unique per point
     price: r.lowestPrice,
+    source: 'local',
+    fetchedAt: r.fetchedAt,
+    airline: r.lowestPriceAirline,
   }));
 
   return (
@@ -63,7 +37,11 @@ export default function PriceChart({ data, currency, targetPrice }: PriceChartPr
       <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" strokeOpacity={0.5} />
         <XAxis
-          dataKey="date"
+          dataKey="time"
+          scale="time"
+          type="number"
+          domain={['dataMin', 'dataMax']}
+          tickFormatter={fmtTick}
           tick={{ fontSize: 10, fill: '#94A3B8' }}
           tickLine={false}
           axisLine={false}
@@ -71,20 +49,16 @@ export default function PriceChart({ data, currency, targetPrice }: PriceChartPr
         />
         <YAxis
           tick={{ fontSize: 10, fill: '#94A3B8' }}
-          tickLine={false}
-          axisLine={false}
-          tickFormatter={fmt}
+          tickLine={false} axisLine={false}
+          tickFormatter={v => fmtPrice(v, currency)}
           width={64}
         />
-        <Tooltip content={<CustomTooltip currency={currency} />} />
+        <Tooltip content={<ChartTooltip currency={currency} />} />
         <ReferenceLine y={targetPrice} stroke="#F59E0B" strokeDasharray="4 4">
           <Label value="Target" position="insideTopRight" fontSize={10} fill="#F59E0B" />
         </ReferenceLine>
         <Line
-          type="monotone"
-          dataKey="price"
-          stroke="#3B82F6"
-          strokeWidth={2}
+          type="monotone" dataKey="price" stroke="#3B82F6" strokeWidth={2}
           dot={{ r: 3, fill: '#3B82F6', strokeWidth: 0 }}
           activeDot={{ r: 5 }}
         />

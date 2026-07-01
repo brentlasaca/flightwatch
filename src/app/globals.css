@@ -39,6 +39,14 @@ body {
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
 
+/* Design Specs v1.7 §10 — chart range highlight token */
+:root {
+  --color-chart-range-highlight: #F87171; /* red-400 */
+}
+.dark {
+  --color-chart-range-highlight: #FCA5A5; /* red-300, lighter for dark chart bg */
+}
+
 /* ── Price Level Badge tokens ─────────────────────────────────── */
 :root {
   --price-level-low-bg:      #16a34a;

@@ -4,7 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import dynamic from 'next/dynamic';
 import {
   ArrowLeft, MoreHorizontal, PauseCircle, Play,
-  RefreshCw, Info, Pencil, AlertTriangle,
+  RefreshCw, Info, Pencil, AlertTriangle, CalendarRange,
 } from 'lucide-react';
 import { getDB } from '@/lib/db';
 import { useApp } from '@/context/AppContext';
@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PriceInsightsPanel } from './PriceInsightsPanel';
 import { AirlineLogo } from './AirlineLogo';
+import { ManageHistorySheet } from './ManageHistorySheet';
 import type { Tracker } from '@/types';
 
 const PriceChart = dynamic(() => import('./PriceChart'), {
@@ -50,6 +51,7 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
   const { toast }      = useToast();
   const [showDelete, setShowDelete] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
+  const [showManageHistory, setShowManageHistory] = useState(false);
   const [deleting, setDeleting]   = useState(false);
   const [justChecked, setJustChecked] = useState(false);
   const justCheckedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -254,9 +256,19 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
 
         {/* Local price history chart */}
         <div className="px-4 mb-4">
-          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-            Price history (90 days)
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+              Price history (90 days)
+            </h2>
+            {/* Manage History entry point — §4.3 / §5.13 */}
+            <button
+              onClick={() => setShowManageHistory(true)}
+              aria-label="Manage price history for this tracker"
+              className="p-2 -mr-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            >
+              <CalendarRange size={16} aria-hidden="true" />
+            </button>
+          </div>
           <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4">
             {successHistory.length >= 2 ? (
               <PriceChart
@@ -327,6 +339,12 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
         onConfirm={handleDelete}
         onCancel={() => setShowDelete(false)}
         loading={deleting}
+      />
+
+      <ManageHistorySheet
+        open={showManageHistory}
+        onClose={() => setShowManageHistory(false)}
+        tracker={tracker}
       />
     </div>
   );

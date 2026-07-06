@@ -11,7 +11,6 @@ import { Home } from '@/components/screens/Home';
 import { Settings } from '@/components/screens/Settings';
 import { TrackerDetail } from '@/components/tracker/TrackerDetail';
 import { CreateEditTracker } from '@/components/tracker/CreateEditTracker';
-import { SystemBanners } from '@/components/system/SystemBanners';
 import { OfflineIndicator } from '@/components/system/OfflineIndicator';
 import { InstallPrompt } from '@/components/system/InstallPrompt';
 import { useTrackerFetch } from '@/hooks/useTrackerFetch';
@@ -85,8 +84,6 @@ function AppContent() {
       <div className="hidden md:block fixed inset-y-0 left-1/2 -translate-x-1/2 w-[480px] shadow-2xl pointer-events-none z-0 border-x border-slate-200 dark:border-slate-700" />
 
       <div className="relative z-10 flex flex-col flex-1 min-h-0">
-        <SystemBanners />
-
         {/*
           `<main>` is the single true scrolling region for all screens.
           `min-h-0` lets it actually shrink to the available flex space
@@ -95,6 +92,10 @@ function AppContent() {
           is the only overflow-y-auto ancestor, each screen's sticky
           AppHeader now correctly pins to the top of *this* scrollport
           instead of scrolling away with the rest of the page.
+
+          SystemBanners renders inside each screen, immediately after its
+          AppHeader, not here — the App Shell (Design Specs §3.1) places
+          the banner below the header, above screen content, never above it.
         */}
         <main className="flex-1 min-h-0 overflow-y-auto">
           {screen === 'home' && (

@@ -11,6 +11,7 @@ import { useApp } from '@/context/AppContext';
 import { useToast } from '@/context/ToastContext';
 import { FREQUENCY_LABEL } from '@/lib/recheck';
 import { AppHeader } from '@/components/ui/AppHeader';
+import { SystemBanners } from '@/components/system/SystemBanners';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -144,6 +145,7 @@ export function TrackerDetail({ tracker, onEdit, onFetch, isFetching }: TrackerD
           Sticky now works correctly because <main> in page.tsx is the
           single bounded overflow-y-auto ancestor. */}
       <AppHeader right={overflowAction} />
+      <SystemBanners />
 
       <div className="pb-24">
         {/* Back nav + route heading */}

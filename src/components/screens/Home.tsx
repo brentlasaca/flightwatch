@@ -8,6 +8,7 @@ import { useApp } from '@/context/AppContext';
 import { useToast } from '@/context/ToastContext';
 import { useTrackerFetch } from '@/hooks/useTrackerFetch';
 import { AppHeader } from '@/components/ui/AppHeader';
+import { SystemBanners } from '@/components/system/SystemBanners';
 import { TrackerCard } from '@/components/tracker/TrackerCard';
 import { FlightwatchLogoMark } from '@/components/ui/FlightwatchLogo';
 import { Modal } from '@/components/ui/Modal';
@@ -222,6 +223,7 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
     <div className="flex flex-col bg-slate-50 dark:bg-slate-900 pb-20">
       {/* App header — no right-slot element (Bell removed per PRD v1.6) */}
       <AppHeader />
+      <SystemBanners />
 
       {/* Search */}
       <div className="px-4 pt-4 pb-3">

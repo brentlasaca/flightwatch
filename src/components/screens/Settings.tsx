@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { AppHeader } from '@/components/ui/AppHeader';
+import { SystemBanners } from '@/components/system/SystemBanners';
 import { TrackerDefaultsPanel } from '@/components/tracker/TrackerDefaultsPanel';
 import type { Theme } from '@/types';
 
@@ -113,6 +114,7 @@ export function Settings() {
     <div className="flex flex-col bg-slate-50 dark:bg-slate-900 pb-24">
       {/* Persistent app header — no right-slot element on Settings */}
       <AppHeader />
+      <SystemBanners />
 
       <div className="px-4 pt-5 pb-4">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>

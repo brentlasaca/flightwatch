@@ -14,22 +14,55 @@ interface FetchAllOptions {
   onTrackerEnd?: (trackerId: string) => void;
   /** Skip the staleness check and recheck every active tracker. Default false. */
   force?: boolean;
+  /**
+   * Stagger delay in ms between sequential fetches (Design Specs v1.8 §5.14).
+   * Fetches always run sequentially regardless of this value — this only
+   * adds a pause between them to avoid tripping SerpAPI's standard rate
+   * limiting during a large "Fetch All" batch. Default 0 (no added delay),
+   * which preserves prior behavior for the opportunistic Home-open recheck.
+   */
+  staggerMs?: number;
+  /**
+   * Checked before each tracker's fetch is started. If it returns true, the
+   * batch stops immediately without starting any further fetches — used by
+   * "Fetch All" cancellation (PRD §4.2.5). A fetch already in flight is not
+   * interrupted by this check; it's only consulted between iterations.
+   */
+  isCancelled?: () => boolean;
+}
+
+/** Outcome of a fetchAllActive run — drives the Fetch All completion toast (Design Specs v1.8 §5.14). */
+export interface FetchAllSummary {
+  /** Number of trackers whose fetch was actually started (and settled or was in-flight when quota hit). */
+  attempted: number;
+  /** Of those attempted, how many returned a successful price. */
+  succeeded: number;
+  /** Of those attempted, how many did not (error, offline, no results — excluding quota exhaustion). */
+  failed: number;
+  /** True if the batch was stopped early via `isCancelled`. */
+  cancelled: boolean;
+  /** True if the batch was stopped early because a fetch hit the SerpAPI quota. */
+  quotaExhausted: boolean;
 }
 
 interface UseFetchResult {
-  fetchTracker: (tracker: Tracker) => Promise<{ quotaExhausted?: boolean }>;
+  fetchTracker: (tracker: Tracker) => Promise<{ quotaExhausted?: boolean; success?: boolean }>;
   /**
    * Opportunistically rechecks active trackers whose recheck interval has
    * elapsed (PRD v1.6 §4.2.2). This is the Home-screen-load batch trigger
    * (PRD §4.2.1, trigger 1) — it must never run on a timer.
+   *
+   * With `force: true`, this also serves as the "Fetch All" batch trigger
+   * (PRD §4.2.5, trigger 4): every active tracker is fetched regardless of
+   * staleness, sequentially, with an optional stagger and cancellation hook.
    */
-  fetchAllActive: (trackers: Tracker[], opts?: FetchAllOptions) => Promise<void>;
+  fetchAllActive: (trackers: Tracker[], opts?: FetchAllOptions) => Promise<FetchAllSummary>;
 }
 
 export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
   const fetchingRef = useRef<Set<string>>(new Set());
 
-  const fetchTracker = useCallback(async (tracker: Tracker): Promise<{ quotaExhausted?: boolean }> => {
+  const fetchTracker = useCallback(async (tracker: Tracker): Promise<{ quotaExhausted?: boolean; success?: boolean }> => {
     if (fetchingRef.current.has(tracker.id)) return {};
     fetchingRef.current.add(tracker.id);
     const db = getDB();
@@ -45,7 +78,9 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
         return { quotaExhausted: true };
       }
 
+      let success = false;
       if (result.status === 'success' && result.lowestPrice > 0) {
+        success = true;
         const prevPrice = tracker.lastKnownPrice;
         // Write airline fields atomically alongside price (PRD v1.7 §4.10.1)
         await db.trackers.update(tracker.id, {
@@ -85,20 +120,33 @@ export function useTrackerFetch(onQuotaExhausted?: () => void): UseFetchResult {
       } else {
         await db.trackers.update(tracker.id, { lastFetchedAt: now, updatedAt: now });
       }
-      return {};
+      return { success };
     } finally {
       fetchingRef.current.delete(tracker.id);
     }
   }, [onQuotaExhausted]);
 
-  const fetchAllActive = useCallback(async (trackers: Tracker[], opts?: FetchAllOptions) => {
+  const fetchAllActive = useCallback(async (trackers: Tracker[], opts?: FetchAllOptions): Promise<FetchAllSummary> => {
     const due = trackers.filter(t => t.status === 'active' && (opts?.force || isTrackerStale(t)));
-    for (const t of due) {
+    let attempted = 0, succeeded = 0, failed = 0, cancelled = false, quotaExhausted = false;
+
+    for (let i = 0; i < due.length; i++) {
+      if (opts?.isCancelled?.()) { cancelled = true; break; }
+      const t = due[i];
       opts?.onTrackerStart?.(t.id);
       const result = await fetchTracker(t);
       opts?.onTrackerEnd?.(t.id);
-      if (result.quotaExhausted) break;
+      attempted++;
+
+      if (result.quotaExhausted) { quotaExhausted = true; break; }
+      if (result.success) succeeded++; else failed++;
+
+      if (opts?.staggerMs && i < due.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, opts.staggerMs));
+      }
     }
+
+    return { attempted, succeeded, failed, cancelled, quotaExhausted };
   }, [fetchTracker]);
 
   return { fetchTracker, fetchAllActive };

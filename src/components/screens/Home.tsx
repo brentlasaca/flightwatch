@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, Info } from 'lucide-react';
+import { Search, Info, RefreshCw } from 'lucide-react';
 import { getDB, pruneOldHistory } from '@/lib/db';
 import { estimateDailyApiCalls } from '@/lib/serpapi';
 import { useApp } from '@/context/AppContext';
@@ -15,13 +15,30 @@ import type { Tracker } from '@/types';
 
 type SortMode = 'updated' | 'price' | 'name';
 
+/** Sort order persistence key (PRD v1.11 §4.5.2, Design Specs v1.8 §4.2). */
+const SORT_STORAGE_KEY = 'trackerListSortOrder';
+const SORT_MODES: SortMode[] = ['updated', 'price', 'name'];
+
+function loadStoredSort(): SortMode {
+  if (typeof window === 'undefined') return 'updated';
+  const stored = window.localStorage.getItem(SORT_STORAGE_KEY);
+  return (SORT_MODES as string[]).includes(stored || '') ? (stored as SortMode) : 'updated';
+}
+
+/** Fetch All batch-level cooldown, separate from any per-tracker debounce (PRD §4.2.5). */
+const FETCH_ALL_COOLDOWN_MS = 60_000;
+/** Brief stagger between sequential fetches in a Fetch All run (Design Specs v1.8 §5.14). */
+const FETCH_ALL_STAGGER_MS = 300;
+
+type FetchAllState = 'idle' | 'confirming' | 'running' | 'cooldown';
+
 interface HomeProps { onAddTracker: () => void; onEditTracker: (t: Tracker) => void; }
 
 export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   const { navigate, setQuotaExhausted } = useApp();
   const { toast } = useToast();
   const [search, setSearch]     = useState('');
-  const [sort, setSort]         = useState<SortMode>('updated');
+  const [sort, setSort]         = useState<SortMode>(loadStoredSort);
   const [deleteTarget, setDeleteTarget] = useState<Tracker | null>(null);
   const [deleting, setDeleting]         = useState(false);
   const [fetchingIds, setFetchingIds]   = useState<Set<string>>(new Set());
@@ -31,6 +48,29 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   // batch fetch or the new-tracker effect below. Seeded synchronously inside
   // the didInitFetch effect so the two effects never double-fetch on first load.
   const seenTrackerIds = useRef<Set<string>>(new Set());
+
+  // Fetch All (PRD §4.2.5 / Design Specs §5.14)
+  const [fetchAllState, setFetchAllState] = useState<FetchAllState>('idle');
+  const [fetchAllProgress, setFetchAllProgress] = useState<{ done: number; total: number } | null>(null);
+  const fetchAllCancelRef = useRef(false);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
+
+  // Persist sort order (PRD §4.5.2) — restored on next visit via loadStoredSort().
+  useEffect(() => {
+    window.localStorage.setItem(SORT_STORAGE_KEY, sort);
+  }, [sort]);
 
   const handleQuota = useCallback(() => {
     setQuotaExhausted(true);
@@ -107,6 +147,56 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
   };
   const sortLabel: Record<SortMode, string> = { updated: 'Recently updated', price: 'Lowest price', name: 'Name (A–Z)' };
 
+  const activeTrackers = (allTrackers || []).filter(t => t.status === 'active');
+  const activeCount = activeTrackers.length;
+
+  // Fetch All — force-fetches every active tracker (PRD §4.2.5, Design Specs §5.14).
+  const handleFetchAllClick = useCallback(() => {
+    if (fetchAllState !== 'idle' || !isOnline || activeCount === 0) return;
+    setFetchAllState('confirming');
+  }, [fetchAllState, isOnline, activeCount]);
+
+  const handleFetchAllCancel = useCallback(() => {
+    setFetchAllState('idle');
+  }, []);
+
+  const handleCancelRun = useCallback(() => {
+    fetchAllCancelRef.current = true;
+  }, []);
+
+  const handleFetchAllConfirm = useCallback(async () => {
+    const total = activeCount;
+    fetchAllCancelRef.current = false;
+    setFetchAllProgress({ done: 0, total });
+    setFetchAllState('running');
+
+    const summary = await fetchAllActive(allTrackers || [], {
+      force: true,
+      staggerMs: FETCH_ALL_STAGGER_MS,
+      isCancelled: () => fetchAllCancelRef.current,
+      onTrackerStart: id => setFetchingIds(prev => new Set([...prev, id])),
+      onTrackerEnd: id => {
+        setFetchingIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+        setFetchAllProgress(prev => prev ? { ...prev, done: prev.done + 1 } : prev);
+      },
+    });
+
+    if (summary.cancelled) {
+      toast(`Fetch all cancelled after ${summary.attempted} of ${total}.`);
+    } else if (!summary.quotaExhausted) {
+      // Quota-exhausted runs already get their own banner/toast via handleQuota above.
+      if (summary.failed > 0) {
+        toast(`Fetched ${summary.attempted}, ${summary.failed} failed.`, summary.failed === summary.attempted ? 'error' : 'success');
+      } else {
+        toast(`Fetched ${summary.attempted} tracker${summary.attempted !== 1 ? 's' : ''}.`);
+      }
+    }
+
+    setFetchAllProgress(null);
+    setFetchAllState('cooldown');
+    setTimeout(() => setFetchAllState('idle'), FETCH_ALL_COOLDOWN_MS);
+  }, [activeCount, allTrackers, fetchAllActive, toast]);
+
   const filtered = (allTrackers || []).filter(t => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -146,15 +236,58 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
         </div>
       </div>
 
-      {/* Sort */}
-      {(allTrackers?.length || 0) > 1 && (
-        <div className="px-4 pb-3">
-          <button
-            onClick={cycleSort}
-            className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
-          >
-            Sort: <span className="font-medium text-slate-700 dark:text-slate-200">{sortLabel[sort]}</span> ↕
-          </button>
+      {/* Sort + Fetch All */}
+      {((allTrackers?.length || 0) > 1 || activeCount > 0) && (
+        <div className="px-4 pb-3 flex items-center justify-between gap-2">
+          {(allTrackers?.length || 0) > 1 ? (
+            <button
+              onClick={cycleSort}
+              className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200"
+            >
+              Sort: <span className="font-medium text-slate-700 dark:text-slate-200">{sortLabel[sort]}</span> ↕
+            </button>
+          ) : <span />}
+
+          {activeCount > 0 && (
+            fetchAllState === 'running' ? (
+              <div className="flex items-center gap-2">
+                <span
+                  role="status"
+                  aria-live="polite"
+                  aria-label={`Fetching ${fetchAllProgress?.done ?? 0} of ${fetchAllProgress?.total ?? activeCount} trackers`}
+                  className="text-xs font-medium text-sky-600 dark:text-sky-400 flex items-center gap-1"
+                >
+                  <RefreshCw size={14} className="animate-spin" />
+                  Fetching {fetchAllProgress?.done ?? 0} of {fetchAllProgress?.total ?? activeCount}…
+                </span>
+                <button
+                  onClick={handleCancelRun}
+                  aria-label="Cancel fetch all"
+                  className="text-xs text-slate-500 dark:text-slate-400 underline hover:text-slate-700 dark:hover:text-slate-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleFetchAllClick}
+                disabled={fetchAllState === 'cooldown' || !isOnline}
+                aria-label={
+                  fetchAllState === 'cooldown'
+                    ? 'Fetch all active trackers, fetched moments ago'
+                    : 'Fetch all active trackers'
+                }
+                className={`text-xs font-medium flex items-center gap-1 transition-colors ${
+                  fetchAllState === 'cooldown' || !isOnline
+                    ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                    : 'text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300'
+                }`}
+              >
+                <RefreshCw size={14} />
+                {fetchAllState === 'cooldown' ? 'Fetched moments ago' : 'Fetch all'}
+              </button>
+            )
+          )}
         </div>
       )}
 
@@ -230,6 +363,17 @@ export function Home({ onAddTracker, onEditTracker }: HomeProps) {
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
+      />
+
+      {/* Fetch All confirmation — not destructive, discloses credit cost (PRD §4.2.5, Design Specs §5.7) */}
+      <Modal
+        open={fetchAllState === 'confirming'}
+        title={`Fetch all ${activeCount} tracker${activeCount !== 1 ? 's' : ''}?`}
+        description={`This will use approximately ${activeCount} SerpAPI credit${activeCount !== 1 ? 's' : ''}.`}
+        confirmLabel="Fetch all"
+        confirmVariant="primary"
+        onConfirm={handleFetchAllConfirm}
+        onCancel={handleFetchAllCancel}
       />
     </div>
   );
